@@ -297,7 +297,11 @@ fn generate_parameter_extraction(analysis: &FunctionAnalysis) -> TokenStream2 {
             // For flattened parameters, deserialize the entire arguments object into the struct
             extraction_code.extend(quote! {
                 let #param_name_ident: #param_ty = if let Some(args) = arguments {
-                    ::serde_json::from_value(::serde_json::Value::Object(args.clone()))
+                    // Convert HashMap to serde_json::Map for proper Value::Object construction
+                    let json_map: ::serde_json::Map<String, ::serde_json::Value> = args.iter()
+                        .map(|(k, v)| (k.clone(), v.clone()))
+                        .collect();
+                    ::serde_json::from_value(::serde_json::Value::Object(json_map))
                         .map_err(|e| turbomcp::ServerError::handler(
                             format!("Invalid arguments for flattened parameter: {}", e)
                         ))?

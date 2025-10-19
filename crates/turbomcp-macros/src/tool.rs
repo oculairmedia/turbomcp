@@ -390,12 +390,16 @@ fn generate_schema(analysis: &FunctionAnalysis) -> TokenStream2 {
                     let root_schema = schema_for!(#param_ty);
                     // Extract just the schema definition (without $schema wrapper)
                     let schema_value = ::serde_json::to_value(&root_schema).unwrap();
-                    if let Some(schema_obj) = schema_value.as_object() {
-                        if let Some(schema_def) = schema_obj.get("schema") {
-                            return schema_def.clone();
+                    let schema_def = if let Some(schema_obj) = schema_value.as_object() {
+                        if let Some(schema) = schema_obj.get("schema") {
+                            schema.clone()
+                        } else {
+                            schema_value
                         }
-                    }
-                    schema_value
+                    } else {
+                        schema_value
+                    };
+                    schema_def
                 }
                 #[cfg(not(feature = "schemars"))]
                 {

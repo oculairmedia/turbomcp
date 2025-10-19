@@ -226,37 +226,14 @@ fn analyze_function_signature(sig: &Signature) -> Result<FunctionAnalysis, syn::
                         }
                         call_args.extend(quote! { turbomcp_ctx });
                     } else {
-                        // Check for #[turbomcp(flatten)] attribute
-                        let has_flatten_attr = pat_ident.attrs.iter().any(|attr| {
-                            // In syn 2.0, use attr.meta instead of attr.parse_meta()
-                            if let syn::Meta::List(list) = &attr.meta {
-                                if list.path.is_ident("turbomcp") {
-                                    // Parse tokens inside the list
-                                    return list.tokens.to_string().contains("flatten");
-                                }
-                            }
-                            false
+                        // For now, just collect the parameter - we'll determine if it's flattened later
+                        parameters.push(ParameterInfo {
+                            name: param_name.to_string(),
+                            ty: (**ty).clone(),
+                            doc: None,
+                            is_flattened: false,  // Will be updated below
+                            original_name: None,
                         });
-
-                        if has_flatten_attr {
-                            // This is a flattened parameter - we'll expand its fields
-                            // For now, mark it and we'll process it in schema generation
-                            parameters.push(ParameterInfo {
-                                name: param_name.to_string(),
-                                ty: (**ty).clone(),
-                                doc: None,
-                                is_flattened: true,
-                                original_name: Some(param_name.to_string()),
-                            });
-                        } else {
-                            parameters.push(ParameterInfo {
-                                name: param_name.to_string(),
-                                ty: (**ty).clone(),
-                                doc: None,
-                                is_flattened: false,
-                                original_name: None,
-                            });
-                        }
 
                         if !first_param {
                             call_args.extend(quote! { , });
@@ -265,6 +242,23 @@ fn analyze_function_signature(sig: &Signature) -> Result<FunctionAnalysis, syn::
                     }
 
                     first_param = false;
+                }
+            }
+        }
+    }
+
+    // Auto-detect flattening: if there's exactly one parameter and it's a named struct type,
+    // assume it should be flattened (will use schemars to generate schema)
+    if parameters.len() == 1 {
+        if let Type::Path(type_path) = &parameters[0].ty {
+            // Check if this looks like a struct type (not a primitive or Option)
+            if let Some(last_segment) = type_path.path.segments.last() {
+                let type_name = last_segment.ident.to_string();
+                // If it ends with "Request" or contains uppercase letters (likely a struct),
+                // mark it as flattened to use schemars schema generation
+                if type_name.ends_with("Request") || type_name.chars().any(|c| c.is_uppercase()) {
+                    parameters[0].is_flattened = true;
+                    parameters[0].original_name = Some(parameters[0].name.clone());
                 }
             }
         }

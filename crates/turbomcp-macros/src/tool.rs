@@ -184,9 +184,12 @@ struct FunctionAnalysis {
 struct ParameterInfo {
     name: String,
     ty: Type,
-    // Doc comment extracted from attributes (if available in future)
-    #[allow(dead_code)]
+    // Doc comment extracted from attributes or struct fields
     doc: Option<String>,
+    // If true, this parameter should be flattened (struct fields become top-level params)
+    is_flattened: bool,
+    // Original parameter name for struct construction (if flattened)
+    original_name: Option<String>,
 }
 
 /// Analyze function signature to extract parameters and generate appropriate code
@@ -223,11 +226,37 @@ fn analyze_function_signature(sig: &Signature) -> Result<FunctionAnalysis, syn::
                         }
                         call_args.extend(quote! { turbomcp_ctx });
                     } else {
-                        parameters.push(ParameterInfo {
-                            name: param_name.to_string(),
-                            ty: (**ty).clone(),
-                            doc: None, // Currently not extracted; future enhancement for Phase 2
+                        // Check for #[turbomcp(flatten)] attribute
+                        let has_flatten_attr = pat_ident.attrs.iter().any(|attr| {
+                            // In syn 2.0, use attr.meta instead of attr.parse_meta()
+                            if let syn::Meta::List(list) = &attr.meta {
+                                if list.path.is_ident("turbomcp") {
+                                    // Parse tokens inside the list
+                                    return list.tokens.to_string().contains("flatten");
+                                }
+                            }
+                            false
                         });
+
+                        if has_flatten_attr {
+                            // This is a flattened parameter - we'll expand its fields
+                            // For now, mark it and we'll process it in schema generation
+                            parameters.push(ParameterInfo {
+                                name: param_name.to_string(),
+                                ty: (**ty).clone(),
+                                doc: None,
+                                is_flattened: true,
+                                original_name: Some(param_name.to_string()),
+                            });
+                        } else {
+                            parameters.push(ParameterInfo {
+                                name: param_name.to_string(),
+                                ty: (**ty).clone(),
+                                doc: None,
+                                is_flattened: false,
+                                original_name: None,
+                            });
+                        }
 
                         if !first_param {
                             call_args.extend(quote! { , });
@@ -343,15 +372,45 @@ fn generate_schema(analysis: &FunctionAnalysis) -> TokenStream2 {
     let mut required_entries: Vec<syn::LitStr> = Vec::new();
 
     for p in &analysis.parameters {
-        let key = syn::LitStr::new(&p.name, proc_macro2::Span::call_site());
-        let schema_ts =
-            crate::schema::generate_json_schema_with_description(&p.ty, p.doc.as_deref());
-        prop_entries.push((key.clone(), schema_ts));
+        if p.is_flattened {
+            // For flattened parameters, we need to use schemars to extract the struct schema at runtime
+            // This will generate code that uses the struct's Serialize/JsonSchema implementation
+            let param_ty = &p.ty;
 
-        // Check if this parameter is required (non-Option type)
-        let is_optional = is_option_type(&p.ty);
-        if !is_optional {
-            required_entries.push(key);
+            // Generate runtime schema extraction code
+            // This will be executed when the tool is registered, not at compile time
+            prop_entries.push((
+                syn::LitStr::new("__flattened_placeholder__", proc_macro2::Span::call_site()),
+                quote! {
+                    {
+                        // Use schemars to generate schema for the type
+                        // Then extract its properties and merge them into the top level
+                        #[cfg(feature = "schema")]
+                        {
+                            use schemars::{JsonSchema, schema_for};
+                            let schema = schema_for!(#param_ty);
+                            // This would need runtime processing which isn't ideal
+                            // Better approach: require users to manually flatten or use a derive macro
+                            ::serde_json::Value::Object(::serde_json::Map::new())
+                        }
+                        #[cfg(not(feature = "schema"))]
+                        {
+                            ::serde_json::Value::Object(::serde_json::Map::new())
+                        }
+                    }
+                },
+            ));
+        } else {
+            let key = syn::LitStr::new(&p.name, proc_macro2::Span::call_site());
+            let schema_ts =
+                crate::schema::generate_json_schema_with_description(&p.ty, p.doc.as_deref());
+            prop_entries.push((key.clone(), schema_ts));
+
+            // Check if this parameter is required (non-Option type)
+            let is_optional = is_option_type(&p.ty);
+            if !is_optional {
+                required_entries.push(key);
+            }
         }
     }
 

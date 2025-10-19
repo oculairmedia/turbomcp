@@ -112,6 +112,8 @@ mod compile_time_router;
 mod completion;
 mod context_aware_dispatch;
 mod elicitation;
+mod flatten_struct;
+mod flatten_tool;
 mod helpers;
 mod ping;
 mod prompt;
@@ -120,6 +122,8 @@ mod schema;
 mod server;
 mod template;
 mod tool;
+// TODO: Fix tool_router compatibility with syn 2.0
+// mod tool_router;
 mod uri_template;
 
 /// Marks an impl block as a TurboMCP server (idiomatic Rust)
@@ -427,4 +431,26 @@ pub fn template(args: TokenStream, input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn ping(args: TokenStream, input: TokenStream) -> TokenStream {
     ping::generate_ping_impl(args, input)
+}
+
+/// Derive macro to generate flattened parameter methods from struct definitions
+///
+/// This macro generates a constructor method that accepts individual parameters
+/// instead of a struct, preserving doc comments as parameter descriptions.
+///
+/// # Example
+///
+/// ```ignore
+/// # use turbomcp_macros::FlattenTool;
+/// #[derive(FlattenTool)]
+/// struct AgentRequest {
+///     /// Operation to perform
+///     operation: String,
+///     /// Agent ID
+///     agent_id: Option<String>,
+/// }
+/// ```
+#[proc_macro_derive(FlattenTool)]
+pub fn flatten_tool(input: TokenStream) -> TokenStream {
+    flatten_struct::derive_flatten_tool(input)
 }

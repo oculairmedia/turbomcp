@@ -392,32 +392,23 @@ fn generate_schema(analysis: &FunctionAnalysis) -> TokenStream2 {
                 {
                     use schemars::{JsonSchema, schema_for};
                     let root_schema = schema_for!(#param_ty);
-                    // Convert RootSchema to Value and merge schema + definitions
-                    let schema_value = ::serde_json::to_value(&root_schema).unwrap();
+                    // schemars RootSchema has this structure:
+                    // { "schema": { actual schema }, "definitions": { ... } }
+                    // We need to flatten this into a single object with $defs
 
-                    let mut result = if let Some(schema_obj) = schema_value.as_object() {
-                        // Extract the inner schema
-                        if let Some(schema) = schema_obj.get("schema") {
-                            if let Some(schema_obj) = schema.as_object() {
-                                schema_obj.clone()
-                            } else {
-                                ::serde_json::Map::new()
-                            }
-                        } else {
-                            ::serde_json::Map::new()
-                        }
-                    } else {
-                        ::serde_json::Map::new()
-                    };
+                    // Use into_object() to get the schema directly
+                    let schema_obj = root_schema.schema;
+                    let mut schema_value = ::serde_json::to_value(&schema_obj).unwrap();
 
-                    // Add definitions if they exist (rename to $defs for JSON Schema draft 2020-12)
-                    if let Some(schema_obj) = schema_value.as_object() {
-                        if let Some(definitions) = schema_obj.get("definitions") {
-                            result.insert("$defs".to_string(), definitions.clone());
+                    // Add definitions as $defs if they exist
+                    if !root_schema.definitions.is_empty() {
+                        if let Some(schema_map) = schema_value.as_object_mut() {
+                            let defs_value = ::serde_json::to_value(&root_schema.definitions).unwrap();
+                            schema_map.insert("$defs".to_string(), defs_value);
                         }
                     }
 
-                    ::serde_json::Value::Object(result)
+                    schema_value
                 }
                 #[cfg(not(feature = "schemars"))]
                 {

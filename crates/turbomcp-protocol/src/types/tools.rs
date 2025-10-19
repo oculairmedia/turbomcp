@@ -289,6 +289,10 @@ pub struct ToolInputSchema {
         skip_serializing_if = "Option::is_none"
     )]
     pub additional_properties: Option<bool>,
+    /// Schema definitions for referenced types (JSON Schema 2020-12 $defs).
+    /// Used to define reusable schemas referenced via $ref.
+    #[serde(rename = "$defs", skip_serializing_if = "Option::is_none")]
+    pub definitions: Option<HashMap<String, serde_json::Value>>,
 }
 
 impl Default for ToolInputSchema {
@@ -299,6 +303,7 @@ impl Default for ToolInputSchema {
             properties: None,
             required: None,
             additional_properties: None,
+            definitions: None,
         }
     }
 }
@@ -316,6 +321,7 @@ impl ToolInputSchema {
             properties: Some(properties),
             required: None,
             additional_properties: None,
+            definitions: None,
         }
     }
 
@@ -329,6 +335,7 @@ impl ToolInputSchema {
             properties: Some(properties),
             required: Some(required),
             additional_properties: Some(false),
+            definitions: None,
         }
     }
 

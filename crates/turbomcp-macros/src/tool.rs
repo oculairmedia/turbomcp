@@ -299,39 +299,53 @@ fn generate_parameter_extraction(analysis: &FunctionAnalysis) -> TokenStream2 {
         let param_name_ident = syn::Ident::new(&param.name, proc_macro2::Span::call_site());
         let param_ty = &param.ty;
 
-        // Check if this is an optional parameter
-        let is_optional = is_option_type(&param.ty);
-
-        if is_optional {
-            // For optional parameters, use None if not present
+        if param.is_flattened {
+            // For flattened parameters, deserialize the entire arguments object into the struct
             extraction_code.extend(quote! {
                 let #param_name_ident: #param_ty = if let Some(args) = arguments {
-                    args.get(#param_name_str)
-                        .map(|v| ::serde_json::from_value(v.clone())
-                            .map_err(|e| turbomcp::ServerError::handler(
-                                format!("Invalid parameter {}: {}", #param_name_str, e)
-                            )))
-                        .transpose()?
-                        .flatten()
+                    ::serde_json::from_value(::serde_json::Value::Object(args.clone()))
+                        .map_err(|e| turbomcp::ServerError::handler(
+                            format!("Invalid arguments for flattened parameter: {}", e)
+                        ))?
                 } else {
-                    None
+                    return Err(turbomcp::ServerError::handler("Missing arguments for flattened parameter"));
                 };
             });
         } else {
-            // For required parameters, fail if not present
-            extraction_code.extend(quote! {
-                let #param_name_ident = arguments
-                    .as_ref()
-                    .ok_or_else(|| turbomcp::ServerError::handler("Missing arguments"))?
-                    .get(#param_name_str)
-                    .ok_or_else(|| turbomcp::ServerError::handler(
-                        format!("Missing required parameter: {}", #param_name_str)
-                    ))?;
-                let #param_name_ident: #param_ty = ::serde_json::from_value(#param_name_ident.clone())
-                    .map_err(|e| turbomcp::ServerError::handler(
-                        format!("Invalid parameter {}: {}", #param_name_str, e)
-                    ))?;
-            });
+            // Check if this is an optional parameter
+            let is_optional = is_option_type(&param.ty);
+
+            if is_optional {
+                // For optional parameters, use None if not present
+                extraction_code.extend(quote! {
+                    let #param_name_ident: #param_ty = if let Some(args) = arguments {
+                        args.get(#param_name_str)
+                            .map(|v| ::serde_json::from_value(v.clone())
+                                .map_err(|e| turbomcp::ServerError::handler(
+                                    format!("Invalid parameter {}: {}", #param_name_str, e)
+                                )))
+                            .transpose()?
+                            .flatten()
+                    } else {
+                        None
+                    };
+                });
+            } else {
+                // For required parameters, fail if not present
+                extraction_code.extend(quote! {
+                    let #param_name_ident = arguments
+                        .as_ref()
+                        .ok_or_else(|| turbomcp::ServerError::handler("Missing arguments"))?
+                        .get(#param_name_str)
+                        .ok_or_else(|| turbomcp::ServerError::handler(
+                            format!("Missing required parameter: {}", #param_name_str)
+                        ))?;
+                    let #param_name_ident: #param_ty = ::serde_json::from_value(#param_name_ident.clone())
+                        .map_err(|e| turbomcp::ServerError::handler(
+                            format!("Invalid parameter {}: {}", #param_name_str, e)
+                        ))?;
+                });
+            }
         }
     }
 
@@ -367,39 +381,50 @@ fn generate_schema(analysis: &FunctionAnalysis) -> TokenStream2 {
         };
     }
 
-    // Build properties map using per-parameter type mapping (fallback)
+    // Check if we have any flattened parameters
+    let has_flattened = analysis.parameters.iter().any(|p| p.is_flattened);
+
+    if has_flattened && analysis.parameters.len() == 1 {
+        // Single flattened parameter - use schemars to generate full schema at runtime
+        let param_ty = &analysis.parameters[0].ty;
+        return quote! {
+            {
+                // Use schemars to generate the schema for the flattened struct
+                #[cfg(feature = "schemars")]
+                {
+                    use schemars::{JsonSchema, schema_for};
+                    let root_schema = schema_for!(#param_ty);
+                    // Extract just the schema definition (without $schema wrapper)
+                    let schema_value = ::serde_json::to_value(&root_schema).unwrap();
+                    if let Some(schema_obj) = schema_value.as_object() {
+                        if let Some(schema_def) = schema_obj.get("schema") {
+                            return schema_def.clone();
+                        }
+                    }
+                    schema_value
+                }
+                #[cfg(not(feature = "schemars"))]
+                {
+                    // Fallback: empty schema
+                    let mut schema_map = ::serde_json::Map::new();
+                    schema_map.insert("type".to_string(), ::serde_json::Value::String("object".to_string()));
+                    schema_map.insert("properties".to_string(), ::serde_json::Value::Object(::serde_json::Map::new()));
+                    schema_map.insert("required".to_string(), ::serde_json::Value::Array(Vec::new()));
+                    schema_map.insert("additionalProperties".to_string(), ::serde_json::Value::Bool(false));
+                    ::serde_json::Value::Object(schema_map)
+                }
+            }
+        };
+    }
+
+    // Build properties map using per-parameter type mapping (for non-flattened or mixed params)
     let mut prop_entries: Vec<(syn::LitStr, TokenStream2)> = Vec::new();
     let mut required_entries: Vec<syn::LitStr> = Vec::new();
 
     for p in &analysis.parameters {
         if p.is_flattened {
-            // For flattened parameters, we need to use schemars to extract the struct schema at runtime
-            // This will generate code that uses the struct's Serialize/JsonSchema implementation
-            let param_ty = &p.ty;
-
-            // Generate runtime schema extraction code
-            // This will be executed when the tool is registered, not at compile time
-            prop_entries.push((
-                syn::LitStr::new("__flattened_placeholder__", proc_macro2::Span::call_site()),
-                quote! {
-                    {
-                        // Use schemars to generate schema for the type
-                        // Then extract its properties and merge them into the top level
-                        #[cfg(feature = "schema")]
-                        {
-                            use schemars::{JsonSchema, schema_for};
-                            let schema = schema_for!(#param_ty);
-                            // This would need runtime processing which isn't ideal
-                            // Better approach: require users to manually flatten or use a derive macro
-                            ::serde_json::Value::Object(::serde_json::Map::new())
-                        }
-                        #[cfg(not(feature = "schema"))]
-                        {
-                            ::serde_json::Value::Object(::serde_json::Map::new())
-                        }
-                    }
-                },
-            ));
+            // Skip flattened parameters in mixed mode (not currently supported)
+            continue;
         } else {
             let key = syn::LitStr::new(&p.name, proc_macro2::Span::call_site());
             let schema_ts =

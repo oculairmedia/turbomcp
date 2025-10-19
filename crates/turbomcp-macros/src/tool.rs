@@ -392,18 +392,32 @@ fn generate_schema(analysis: &FunctionAnalysis) -> TokenStream2 {
                 {
                     use schemars::{JsonSchema, schema_for};
                     let root_schema = schema_for!(#param_ty);
-                    // Extract just the schema definition (without $schema wrapper)
+                    // Convert RootSchema to Value and merge schema + definitions
                     let schema_value = ::serde_json::to_value(&root_schema).unwrap();
-                    let schema_def = if let Some(schema_obj) = schema_value.as_object() {
+
+                    let mut result = if let Some(schema_obj) = schema_value.as_object() {
+                        // Extract the inner schema
                         if let Some(schema) = schema_obj.get("schema") {
-                            schema.clone()
+                            if let Some(schema_obj) = schema.as_object() {
+                                schema_obj.clone()
+                            } else {
+                                ::serde_json::Map::new()
+                            }
                         } else {
-                            schema_value
+                            ::serde_json::Map::new()
                         }
                     } else {
-                        schema_value
+                        ::serde_json::Map::new()
                     };
-                    schema_def
+
+                    // Add definitions if they exist (rename to $defs for JSON Schema draft 2020-12)
+                    if let Some(schema_obj) = schema_value.as_object() {
+                        if let Some(definitions) = schema_obj.get("definitions") {
+                            result.insert("$defs".to_string(), definitions.clone());
+                        }
+                    }
+
+                    ::serde_json::Value::Object(result)
                 }
                 #[cfg(not(feature = "schemars"))]
                 {

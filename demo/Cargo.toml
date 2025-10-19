@@ -7,8 +7,8 @@ description = "Demo project showcasing TurboMCP in action"
 publish = false
 
 [dependencies]
-# Using the TurboMCP SDK for zero boilerplate
-turbomcp = { path = "../crates/turbomcp" }
+# Using the TurboMCP SDK for zero boilerplate (from workspace root)
+turbomcp = { path = ".." }
 
 # Internal dependencies needed by the macro
 turbomcp-protocol = { path = "../crates/turbomcp-protocol" }

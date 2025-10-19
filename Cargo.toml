@@ -1,13 +1,71 @@
-# Workspace-only Cargo.toml - main SDK is in crates/turbomcp
+# Workspace with root package for git dependency compatibility
+# The root package is a thin wrapper that re-exports crates/turbomcp
+
+[package]
+name = "turbomcp"
+version = "2.0.0-rc.3"
+edition = "2024"
+authors = ["Nicholas Paterno <nick@epistates.com>", "Oculair Media"]
+description = "Rust SDK for Model Context Protocol (MCP) with $defs support and parameter flattening"
+license = "MIT"
+repository = "https://github.com/oculairmedia/turbomcp"
+publish = false
+
+# This allows the workspace to be used as a git dependency
+# Re-export turbomcp-core as turbomcp
+[lib]
+name = "turbomcp"
+path = "src/lib.rs"
+
+# Re-export turbomcp-core with all features passed through
+[dependencies]
+turbomcp-core = { version = "2.0.0-rc.3", path = "crates/turbomcp", default-features = false }
+
+# All features are passed through to turbomcp-core
+[features]
+default = ["turbomcp-core/default"]
+minimal = ["turbomcp-core/minimal"]
+full = ["turbomcp-core/full"]
+network = ["turbomcp-core/network"]
+server-only = ["turbomcp-core/server-only"]
+
+# Core functionality
+schema-generation = ["turbomcp-core/schema-generation"]
+context-injection = ["turbomcp-core/context-injection"]
+uri-templates = ["turbomcp-core/uri-templates"]
+
+# Authentication features
+auth = ["turbomcp-core/auth"]
+dpop = ["turbomcp-core/dpop"]
+dpop-redis = ["turbomcp-core/dpop-redis"]
+dpop-hsm-pkcs11 = ["turbomcp-core/dpop-hsm-pkcs11"]
+dpop-hsm-yubico = ["turbomcp-core/dpop-hsm-yubico"]
+dpop-hsm = ["turbomcp-core/dpop-hsm"]
+dpop-test-utils = ["turbomcp-core/dpop-test-utils"]
+redis-storage = ["turbomcp-core/redis-storage"]
+
+# Transport protocols
+stdio = ["turbomcp-core/stdio"]
+http = ["turbomcp-core/http"]
+websocket = ["turbomcp-core/websocket"]
+tcp = ["turbomcp-core/tcp"]
+unix = ["turbomcp-core/unix"]
+
+# Performance
+simd = ["turbomcp-core/simd"]
+all-transports = ["turbomcp-core/all-transports"]
+
+# Compatibility alias for schemars (used by external dependencies)
+schemars = ["schema-generation"]
 
 [workspace]
 members = [
+    "crates/turbomcp",  # turbomcp-core (the actual implementation)
     "crates/turbomcp-protocol",
     "crates/turbomcp-transport",
     "crates/turbomcp-server",
     "crates/turbomcp-client",
     "crates/turbomcp-cli",
-    "crates/turbomcp",
     "crates/turbomcp-macros",
     "crates/turbomcp-dpop",  # 2.0.0: Re-extracted for clean minimal build
     "crates/turbomcp-auth",  # 2.0.0: Extracted for clean minimal build
@@ -15,6 +73,7 @@ members = [
     # "crates/turbomcp-security", # DISSOLVED: Security functionality moved to individual crates per ephemeral strategy
     "demo",
 ]
+# Note: The root package (turbomcp) re-exports turbomcp-core for git dependency compatibility
 resolver = "2"
 
 [workspace.lints.rust]

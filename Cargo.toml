@@ -5,6 +5,7 @@
 name = "turbomcp"
 version = "2.0.0-rc.3"
 edition = "2024"
+rust-version = "1.89.0"
 authors = ["Nicholas Paterno <nick@epistates.com>", "Oculair Media"]
 description = "Rust SDK for Model Context Protocol (MCP) with $defs support and parameter flattening"
 license = "MIT"

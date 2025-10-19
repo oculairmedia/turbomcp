@@ -391,24 +391,19 @@ fn generate_schema(analysis: &FunctionAnalysis) -> TokenStream2 {
                 #[cfg(feature = "schemars")]
                 {
                     use schemars::{JsonSchema, schema_for};
+                    // schema_for! returns RootSchema which when serialized produces:
+                    // {
+                    //   "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    //   "title": "MyStruct",
+                    //   "type": "object",
+                    //   "properties": {...},
+                    //   "required": [...],
+                    //   "$defs": {...}  // <-- definitions are already at top level with correct key
+                    // }
                     let root_schema = schema_for!(#param_ty);
-                    // schemars RootSchema has this structure:
-                    // { "schema": { actual schema }, "definitions": { ... } }
-                    // We need to flatten this into a single object with $defs
 
-                    // Use into_object() to get the schema directly
-                    let schema_obj = root_schema.schema;
-                    let mut schema_value = ::serde_json::to_value(&schema_obj).unwrap();
-
-                    // Add definitions as $defs if they exist
-                    if !root_schema.definitions.is_empty() {
-                        if let Some(schema_map) = schema_value.as_object_mut() {
-                            let defs_value = ::serde_json::to_value(&root_schema.definitions).unwrap();
-                            schema_map.insert("$defs".to_string(), defs_value);
-                        }
-                    }
-
-                    schema_value
+                    // Serialize the entire RootSchema - this includes $defs automatically
+                    ::serde_json::to_value(&root_schema).unwrap()
                 }
                 #[cfg(not(feature = "schemars"))]
                 {

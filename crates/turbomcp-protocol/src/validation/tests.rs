@@ -1022,6 +1022,7 @@ fn create_valid_tool() -> Tool {
             properties: None,
             required: None,
             additional_properties: None,
+            definitions: None,
         },
         output_schema: None,
         execution: None,

@@ -95,6 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             properties: Some(properties),
             required: Some(vec!["question".to_string()]),
             additional_properties: Some(false),
+            definitions: None,
         },
         output_schema: None,
         execution: None,

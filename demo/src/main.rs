@@ -61,6 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }),
             required: None,
             additional_properties: Some(false),
+            definitions: None,
         },
         output_schema: None,
         execution: None,

@@ -180,6 +180,7 @@ impl ServerToolHandler for TurboToolHandlerWrapper {
                 properties: None,
                 required: None,
                 additional_properties: None,
+                definitions: None,
             },
             output_schema: None,
             annotations: None,

@@ -68,6 +68,7 @@ where
             properties: Some(HashMap::new()),
             required: None,
             additional_properties: None,
+            definitions: None,
         },
         output_schema: None,
         execution: None,

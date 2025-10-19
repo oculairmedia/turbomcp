@@ -818,6 +818,7 @@ mod integrated_server_features {
                 }),
                 required: Some(vec!["resource_uri".to_string()]),
                 additional_properties: None,
+                definitions: None,
             },
             output_schema: None,
             execution: None,

@@ -689,6 +689,7 @@ fn test_tool() {
             properties: None,
             required: None,
             additional_properties: None,
+            definitions: None,
         },
         output_schema: None,
         execution: None,
@@ -720,6 +721,7 @@ fn test_tool_with_annotations() {
             properties: None,
             required: None,
             additional_properties: None,
+            definitions: None,
         },
         output_schema: None,
         annotations: Some(annotations),
@@ -742,6 +744,7 @@ fn test_tool_input_schema() {
         properties: Some(properties),
         required: Some(vec!["param1".to_string()]),
         additional_properties: Some(false),
+        definitions: None,
     };
 
     assert_eq!(schema.schema_type, "object");
@@ -761,6 +764,7 @@ fn test_tool_serialization() {
             properties: None,
             required: None,
             additional_properties: None,
+            definitions: None,
         },
         output_schema: None,
         execution: None,
@@ -984,6 +988,7 @@ fn test_comprehensive_serialization() {
             }),
             required: Some(vec!["param1".to_string()]),
             additional_properties: Some(false),
+            definitions: None,
         },
         output_schema: Some(ToolOutputSchema {
             schema_type: "object".to_string(),
@@ -1258,6 +1263,7 @@ fn test_tool_with_complete_annotations_integration() {
             }),
             required: Some(vec!["path".to_string(), "operation".to_string()]),
             additional_properties: None,
+            definitions: None,
         },
         output_schema: Some(ToolOutputSchema {
             schema_type: "object".to_string(),

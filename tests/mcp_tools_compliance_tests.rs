@@ -131,6 +131,7 @@ mod tools_list_tests {
                         }),
                         required: Some(vec!["location".to_string()]),
                         additional_properties: None,
+                        definitions: None,
                     },
                     output_schema: None,
                     execution: None,
@@ -175,6 +176,7 @@ mod tools_list_tests {
                 properties: None,
                 required: None,
                 additional_properties: None,
+                definitions: None,
             },
             output_schema: None,
             annotations: Some(ToolAnnotations {
@@ -372,6 +374,7 @@ mod tool_call_tests {
                 }),
                 required: Some(vec!["location".to_string()]),
                 additional_properties: None,
+                definitions: None,
             },
             output_schema: Some(ToolOutputSchema {
                 schema_type: "object".to_string(),
@@ -596,6 +599,7 @@ mod tool_security_tests {
                 }),
                 required: Some(vec!["user_id".to_string(), "amount".to_string()]),
                 additional_properties: Some(false), // Strict: no additional properties
+                definitions: None,
             },
             output_schema: None,
             annotations: None,
@@ -640,6 +644,7 @@ mod tool_security_tests {
                 }),
                 required: Some(vec!["file_path".to_string()]),
                 additional_properties: None,
+                definitions: None,
             },
             output_schema: None,
             annotations: Some(ToolAnnotations {
@@ -684,6 +689,7 @@ mod tool_security_tests {
                 properties: None,
                 required: None,
                 additional_properties: None,
+                definitions: None,
             },
             output_schema: None,
             annotations: None,
@@ -763,6 +769,7 @@ mod tool_pagination_tests {
                 properties: None,
                 required: None,
                 additional_properties: None,
+                definitions: None,
             },
             output_schema: None,
             annotations: None,
@@ -809,6 +816,7 @@ mod tool_message_flow_tests {
                         }),
                         required: Some(vec!["city".to_string()]),
                         additional_properties: None,
+                        definitions: None,
                     },
                     output_schema: None,
                     execution: None,
@@ -895,6 +903,7 @@ mod tool_annotation_tests {
                 properties: None,
                 required: None,
                 additional_properties: None,
+                definitions: None,
             },
             output_schema: None,
             annotations: Some(ToolAnnotations {
@@ -937,6 +946,7 @@ mod tool_annotation_tests {
                 properties: None,
                 required: None,
                 additional_properties: None,
+                definitions: None,
             },
             output_schema: None,
             annotations: Some(ToolAnnotations {

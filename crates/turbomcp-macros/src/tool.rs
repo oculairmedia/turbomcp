@@ -414,16 +414,21 @@ pub fn generate_schema_code(parameters: &[ParameterInfo], krate: &TokenStream) -
         prop_code.push(quote! {
             {
                 let mut prop = #schema_code;
-                // Strip $schema from property-level schemas — it should only
-                // appear at the root schema document, not inside individual
-                // properties. Many MCP clients reject property schemas that
-                // contain $schema (it confuses validators into treating the
-                // property as a standalone schema document).
+                // Strip $schema from property-level schemas — it belongs
+                // only at the root document, not inside properties.
                 prop.remove("$schema");
-                // Strip title from properties — it adds noise without value
-                // at the property level (e.g. "Nullable_AnyValue") and the
-                // description attribute provides better context.
+                // Strip title — noisy at property level (e.g. "Nullable_AnyValue").
+                // The #[description] attribute provides better context.
                 prop.remove("title");
+                // If no "type" after stripping schemars metadata, this is an
+                // unconstrained type (e.g. serde_json::Value). MCP clients
+                // require "type" on every property, so add a permissive catch-all.
+                if !prop.contains_key("type") {
+                    let type_values: Vec<#krate::__macro_support::serde_json::Value> = vec![
+                        "string", "number", "integer", "boolean", "object", "array", "null"
+                    ].into_iter().map(|s| #krate::__macro_support::serde_json::Value::String(s.to_string())).collect();
+                    prop.insert("type".to_string(), #krate::__macro_support::serde_json::Value::Array(type_values));
+                }
                 #description_code
                 properties.insert(#name.to_string(), #krate::__macro_support::serde_json::Value::Object(prop));
             }

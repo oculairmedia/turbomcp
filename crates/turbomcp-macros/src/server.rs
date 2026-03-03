@@ -431,7 +431,8 @@ fn extract_doc_comments(attrs: &[syn::Attribute]) -> Option<String> {
     }
 }
 
-/// Strip #[tool], #[resource], and #[prompt] attributes from impl items.
+/// Strip #[tool], #[resource], and #[prompt] attributes from impl items,
+/// and #[description] attributes from function parameters.
 fn strip_handler_attributes(impl_block: &ItemImpl) -> ItemImpl {
     let mut stripped = impl_block.clone();
     for item in &mut stripped.items {
@@ -441,6 +442,14 @@ fn strip_handler_attributes(impl_block: &ItemImpl) -> ItemImpl {
                     && !attr.path().is_ident("resource")
                     && !attr.path().is_ident("prompt")
             });
+            // Strip #[description] from function parameters so they don't
+            // end up in the output impl block (they're only needed by the
+            // schema generation code, not the actual method signatures).
+            for input in &mut method.sig.inputs {
+                if let syn::FnArg::Typed(pat_type) = input {
+                    pat_type.attrs.retain(|attr| !attr.path().is_ident("description"));
+                }
+            }
         }
     }
     stripped
